@@ -1,0 +1,35 @@
+{
+  "name": "social-media-dashboard",
+  "version": "1.0.0",
+  "description": "Multi-Screen Social Media Automation Dashboard",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "cd src/main && npx tsc",
+    "build:renderer": "webpack --config webpack.config.js",
+    "copy:preload": "cp src/main/preload-main.js src/main/preload-webview.js dist/main/",
+    "build": "npm run build:main && npm run copy:preload && npm run build:renderer",
+    "start": "npm run build && npx electron dist/main/main.js",
+    "dev": "npm run build && npx electron dist/main/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^36.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "concurrently": "^9.1.2",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.3",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "wait-on": "^8.0.3",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.2"
+  }
+}
