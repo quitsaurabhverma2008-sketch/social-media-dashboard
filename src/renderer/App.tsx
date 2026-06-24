@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import TitleBar from './components/TitleBar';
 import ControlBar from './components/ControlBar';
+import StatsBar, { ScreenStats } from './components/StatsBar';
 import ScreenCard from './components/ScreenCard';
 
 export interface Screen {
@@ -37,6 +38,10 @@ export default function App() {
   const [globalUrl, setGlobalUrl] = useState('https://www.instagram.com/reels/');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Analytics state: per-screen scroll counts and metadata
+  const [screenAnalytics, setScreenAnalytics] = useState<Map<number, ScreenStats>>(new Map());
+  const [totalScrolls, setTotalScrolls] = useState(0);
+
   const addScreen = useCallback((url?: string) => {
     const id = ++screenIdCounter;
     const newScreen: Screen = {
@@ -45,6 +50,11 @@ export default function App() {
       url: url || globalUrl,
     };
     setScreens((prev) => [...prev, newScreen]);
+    setScreenAnalytics((prev) => {
+      const next = new Map(prev);
+      next.set(id, { scrollCount: 0, lastScrollTime: null, uptime: 0, addedAt: Date.now() });
+      return next;
+    });
     setShowAddModal(false);
   }, [globalUrl]);
 
@@ -54,6 +64,11 @@ export default function App() {
       window.electronAPI.unregisterWebview(id);
     }
     setScreens((prev) => prev.filter((s) => s.id !== id));
+    setScreenAnalytics((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }, [autoScrollActive]);
 
   const renameScreen = useCallback((id: number, name: string) => {
@@ -66,6 +81,23 @@ export default function App() {
     setScreens((prev) =>
       prev.map((s) => (s.id === id ? { ...s, url } : s))
     );
+  }, []);
+
+  // Called by ScreenCard when a scroll executes
+  const recordScroll = useCallback((screenId: number) => {
+    setTotalScrolls((t) => t + 1);
+    setScreenAnalytics((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(screenId);
+      if (existing) {
+        next.set(screenId, {
+          ...existing,
+          scrollCount: existing.scrollCount + 1,
+          lastScrollTime: Date.now(),
+        });
+      }
+      return next;
+    });
   }, []);
 
   const toggleAutoScroll = useCallback(() => {
@@ -93,6 +125,10 @@ export default function App() {
     });
   }, [addScreen]);
 
+  // Convert analytics map to array for StatsBar
+  const screenStatsArray: ScreenStats[] = [];
+  screenAnalytics.forEach((stats) => screenStatsArray.push(stats));
+
   return (
     <div className="app-container">
       <TitleBar />
@@ -104,6 +140,13 @@ export default function App() {
         screenCount={screens.length}
         globalUrl={globalUrl}
         onGlobalUrlChange={setGlobalUrl}
+      />
+
+      <StatsBar
+        screenCount={screens.length}
+        totalScrolls={totalScrolls}
+        autoScrollActive={autoScrollActive}
+        screens={screenStatsArray}
       />
 
       <div className="screen-grid">
@@ -118,16 +161,21 @@ export default function App() {
           </div>
         )}
 
-        {screens.map((screen) => (
-          <ScreenCard
-            key={screen.id}
-            screen={screen}
-            onRemove={removeScreen}
-            onRename={renameScreen}
-            onNavigate={navigateScreen}
-            autoScrollActive={autoScrollActive}
-          />
-        ))}
+        {screens.map((screen) => {
+          const analytics = screenAnalytics.get(screen.id);
+          return (
+            <ScreenCard
+              key={screen.id}
+              screen={screen}
+              onRemove={removeScreen}
+              onRename={renameScreen}
+              onNavigate={navigateScreen}
+              autoScrollActive={autoScrollActive}
+              onScrollExecuted={recordScroll}
+              scrollCount={analytics?.scrollCount ?? 0}
+            />
+          );
+        })}
       </div>
 
       {showAddModal && (

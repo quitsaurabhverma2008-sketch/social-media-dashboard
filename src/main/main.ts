@@ -25,7 +25,9 @@ function createMainWindow(): void {
     titleBarStyle: 'hidden',
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  // In packaged app, __dirname points to dist/main/, so ../renderer/index.html works
+  // In development, same path works since webpack outputs to dist/renderer/
+  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;

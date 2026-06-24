@@ -10,6 +10,8 @@ interface ScreenCardProps {
   onRename: (id: number, name: string) => void;
   onNavigate: (id: number, url: string) => void;
   autoScrollActive: boolean;
+  onScrollExecuted?: (screenId: number) => void;
+  scrollCount?: number;
 }
 
 // Electron webview element type (not in standard DOM types)
@@ -35,6 +37,8 @@ export default function ScreenCard({
   onRename,
   onNavigate,
   autoScrollActive,
+  onScrollExecuted,
+  scrollCount = 0,
 }: ScreenCardProps) {
   const webviewRef = useRef<ElectronWebviewElement>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -127,13 +131,14 @@ export default function ScreenCard({
           })()
         `;
         webview.executeJavaScript(scrollJS).catch(() => {});
+        if (onScrollExecuted) onScrollExecuted(screen.id);
       }, humanDelay);
     });
 
     return () => {
       removeListener();
     };
-  }, [screen.id]);
+  }, [screen.id, onScrollExecuted]);
 
   const handleReload = useCallback(() => {
     const webview = webviewRef.current;
@@ -207,9 +212,12 @@ export default function ScreenCard({
             </span>
           )}
           <span className="screen-id">#{screen.id}</span>
-          {autoScrollActive && (
-            <span className="scroll-active-badge">🔄 Auto</span>
-          )}
+        {autoScrollActive && (
+          <span className="scroll-active-badge">🔄 Auto</span>
+        )}
+        {scrollCount > 0 && (
+          <span className="scroll-count-badge">{scrollCount} scrolls</span>
+        )}
         </div>
 
         <div className="screen-controls">

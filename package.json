@@ -8,14 +8,52 @@
     "build:renderer": "webpack --config webpack.config.js",
     "copy:preload": "cp src/main/preload-main.js src/main/preload-webview.js dist/main/",
     "build": "npm run build:main && npm run copy:preload && npm run build:renderer",
+    "build:web": "webpack --config webpack.web.config.js",
     "start": "npm run build && npx electron dist/main/main.js",
-    "dev": "npm run build && npx electron dist/main/main.js"
+    "dev": "npm run build && npx electron dist/main/main.js",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.xubinsta.dashboard",
+    "productName": "Social Media Dashboard",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "electron": "^36.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -24,12 +62,15 @@
     "@types/react-dom": "^19.1.6",
     "concurrently": "^9.1.2",
     "css-loader": "^7.1.2",
+    "electron": "^36.5.0",
+    "electron-builder": "^26.15.3",
     "html-webpack-plugin": "^5.6.3",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
+    "vercel": "^54.15.1",
     "wait-on": "^8.0.3",
     "webpack": "^5.99.9",
-    "webpack-cli": "^6.0.2"
+    "webpack-cli": "^7.0.0"
   }
 }
