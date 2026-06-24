@@ -104,6 +104,7 @@ body {
   display: flex;
   gap: 2px;
   -webkit-app-region: no-drag;
+  align-items: center;
 }
 
 .title-btn {
@@ -129,6 +130,72 @@ body {
 .title-btn.close:hover {
   background: var(--accent-danger);
   color: white;
+}
+
+/* Extension Status Indicator */
+
+.ext-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  cursor: default;
+  -webkit-app-region: no-drag;
+  transition: all var(--transition-fast);
+}
+
+.ext-status.connected {
+  border-color: rgba(0, 184, 148, 0.3);
+  background: rgba(0, 184, 148, 0.08);
+}
+
+.ext-status.disconnected {
+  border-color: rgba(231, 76, 60, 0.2);
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.ext-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  transition: all var(--transition-normal);
+}
+
+.ext-dot.active {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.ext-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ext-status.connected .ext-label {
+  color: var(--accent-success);
+}
+
+.ext-badge {
+  padding: 4px 10px;
+  background: rgba(0, 184, 148, 0.1);
+  border: 1px solid rgba(0, 184, 148, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-success);
+  white-space: nowrap;
+}
+
+/* Extension connected footer label */
+.session-label.ext-active {
+  color: var(--accent-success);
+  font-weight: 600;
 }
 
 /* ============================================

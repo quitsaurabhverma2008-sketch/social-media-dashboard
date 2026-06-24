@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import WebScreenCard from './WebScreenCard';
 
 export interface Screen {
@@ -9,6 +9,8 @@ export interface Screen {
 
 let screenIdCounter = 0;
 
+const EXT_POLL_INTERVAL = 2000; // Check extension connection every 2s
+
 export default function WebApp() {
   const [screens, setScreens] = useState<Screen[]>([]);
   const [autoScrollActive, setAutoScrollActive] = useState(false);
@@ -17,28 +19,38 @@ export default function WebApp() {
   const [modalUrl, setModalUrl] = useState('https://www.instagram.com/reels/');
   const [totalScrolls, setTotalScrolls] = useState(0);
   const [screenScrollCounts, setScreenScrollCounts] = useState<Map<number, number>>(new Map());
+  const [extConnected, setExtConnected] = useState(false);
+  const extPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const screensRef = useRef(screens);
+  screensRef.current = screens;
 
-  const addScreen = useCallback((url?: string) => {
-    const id = ++screenIdCounter;
-    const newScreen: Screen = { id, name: `Screen ${id}`, url: url || globalUrl };
-    setScreens((prev) => [...prev, newScreen]);
-    setScreenScrollCounts((prev) => new Map(prev).set(id, 0));
-    setShowAddModal(false);
-    setModalUrl(globalUrl);
-  }, [globalUrl]);
-
-  const removeScreen = useCallback((id: number) => {
-    setScreens((prev) => prev.filter((s) => s.id !== id));
-    setScreenScrollCounts((prev) => { const next = new Map(prev); next.delete(id); return next; });
+  // Check extension connection periodically
+  const checkExtension = useCallback(() => {
+    const ext = (window as any).__autoScrollExtension;
+    const connected = ext?.connected === true;
+    setExtConnected(connected);
+    return connected;
   }, []);
 
-  const renameScreen = useCallback((id: number, name: string) => {
-    setScreens((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
-  }, []);
+  useEffect(() => {
+    // Initial check after bridge script loads
+    setTimeout(checkExtension, 500);
 
-  const navigateScreen = useCallback((id: number, url: string) => {
-    setScreens((prev) => prev.map((s) => (s.id === id ? { ...s, url } : s)));
-  }, []);
+    // Listen for connection changes
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setExtConnected(detail.connected);
+    };
+    window.addEventListener('extension-connection-change', handler);
+
+    // Poll as fallback
+    extPollRef.current = setInterval(checkExtension, EXT_POLL_INTERVAL);
+
+    return () => {
+      window.removeEventListener('extension-connection-change', handler);
+      if (extPollRef.current) clearInterval(extPollRef.current);
+    };
+  }, [checkExtension]);
 
   const recordScroll = useCallback((screenId: number) => {
     setTotalScrolls((t) => t + 1);
@@ -49,10 +61,88 @@ export default function WebApp() {
     });
   }, []);
 
+  // Listen for extension scroll-executed events for analytics
+  const recordScrollRef = useRef(recordScroll);
+  recordScrollRef.current = recordScroll;
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.screenId) {
+        recordScrollRef.current(detail.screenId);
+      }
+    };
+    window.addEventListener('extension-scroll-executed', handler);
+    return () => window.removeEventListener('extension-scroll-executed', handler);
+  }, []);
+
+  // Helper to register a screen with the extension
+  const registerWithExtension = useCallback((screenId: number, url: string) => {
+    const ext = (window as any).__autoScrollExtension;
+    if (ext?.connected) {
+      ext.registerScreen(screenId, url).catch(() => {});
+    }
+  }, []);
+
+  // Helper to unregister from extension
+  const unregisterFromExtension = useCallback((screenId: number) => {
+    const ext = (window as any).__autoScrollExtension;
+    if (ext?.connected) {
+      ext.unregisterScreen(screenId);
+    }
+  }, []);
+
+  const addScreen = useCallback((url?: string) => {
+    const id = ++screenIdCounter;
+    const targetUrl = url || globalUrl;
+    const newScreen: Screen = { id, name: `Screen ${id}`, url: targetUrl };
+    setScreens((prev) => [...prev, newScreen]);
+    setScreenScrollCounts((prev) => new Map(prev).set(id, 0));
+    setShowAddModal(false);
+    setModalUrl(globalUrl);
+
+    // Register with extension if connected
+    registerWithExtension(id, targetUrl);
+  }, [globalUrl, registerWithExtension]);
+
+  const removeScreen = useCallback((id: number) => {
+    setScreens((prev) => prev.filter((s) => s.id !== id));
+    setScreenScrollCounts((prev) => { const next = new Map(prev); next.delete(id); return next; });
+    unregisterFromExtension(id);
+  }, [unregisterFromExtension]);
+
+  const renameScreen = useCallback((id: number, name: string) => {
+    setScreens((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }, []);
+
+  const navigateScreen = useCallback((id: number, url: string) => {
+    setScreens((prev) => prev.map((s) => (s.id === id ? { ...s, url } : s)));
+    registerWithExtension(id, url);
+  }, [registerWithExtension]);
+
   const addMultipleScreens = useCallback(() => {
     ['https://www.instagram.com/reels/', 'https://www.youtube.com/shorts/', 'https://www.tiktok.com/']
       .forEach((url, i) => setTimeout(() => addScreen(url), i * 200));
   }, [addScreen]);
+
+  // When auto-scroll toggles, notify extension
+  const handleToggleAutoScroll = useCallback(() => {
+    const ext = (window as any).__autoScrollExtension;
+    setAutoScrollActive((prev) => {
+      const next = !prev;
+      if (ext?.connected) {
+        if (next) {
+          // Register all current screens and start auto-scroll
+          screensRef.current.forEach(s => {
+            ext.registerScreen(s.id, s.url);
+            ext.startAutoScroll(s.id);
+          });
+        } else {
+          ext.stopAllAutoScroll();
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const avgScrolls = screens.length > 0 ? Math.round(totalScrolls / screens.length) : 0;
 
@@ -63,6 +153,14 @@ export default function WebApp() {
         <div className="title-bar-drag">
           <span className="title-bar-logo">⬡</span>
           <span className="title-bar-title">Social Media Dashboard — Web</span>
+        </div>
+        <div className="title-bar-controls">
+          {/* Extension status indicator */}
+          <div className={`ext-status ${extConnected ? 'connected' : 'disconnected'}`}
+            title={extConnected ? 'Extension connected - auto-scroll works in real tabs' : 'Extension not found - install for full auto-scroll'}>
+            <span className={`ext-dot ${extConnected ? 'active' : ''}`} />
+            <span className="ext-label">{extConnected ? 'Extension Active' : 'No Extension'}</span>
+          </div>
         </div>
       </div>
 
@@ -75,6 +173,11 @@ export default function WebApp() {
           <button className="btn-secondary" onClick={addMultipleScreens}>
             <span className="btn-icon-text">⚡</span> Quick Add 3
           </button>
+          {extConnected && (
+            <span className="ext-badge" title="Extension connected - new tabs will open automatically">
+              🔌 Extension Mode
+            </span>
+          )}
           <div className="separator" />
           <div className="url-input-group">
             <label htmlFor="global-url">Default URL:</label>
@@ -88,7 +191,7 @@ export default function WebApp() {
             <span className="counter-value">{screens.length}</span>
           </div>
           <button className={`btn-scroll-toggle ${autoScrollActive ? 'active' : ''}`}
-            onClick={() => setAutoScrollActive((p) => !p)}>
+            onClick={handleToggleAutoScroll}>
             <span className="scroll-icon">{autoScrollActive ? '⏸' : '▶'}</span>
             <span className="scroll-label">Auto Scroll: {autoScrollActive ? 'ON' : 'OFF'}</span>
             {autoScrollActive && <span className="pulse-dot" />}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      margin: 0;
+    }
+    h2 {
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      color: #fff;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+    .dot.inactive { background: #ef4444; animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .info {
+      font-size: 12px;
+      color: #888;
+      line-height: 1.5;
+    }
+    .info strong { color: #ccc; }
+    .site-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .site-tag {
+      padding: 2px 8px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <h2>⬡ Social Media Auto-Scroll</h2>
+  <div class="status">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Connected</span>
+  </div>
+  <div class="info">
+    <strong>Supported Sites:</strong>
+    <div class="site-list">
+      <span class="site-tag">Instagram</span>
+      <span class="site-tag">YouTube Shorts</span>
+      <span class="site-tag">TikTok</span>
+      <span class="site-tag">Facebook</span>
+      <span class="site-tag">X (Twitter)</span>
+    </div>
+  </div>
+  <div class="info" style="margin-top: 12px;">
+    <strong>How to use:</strong><br>
+    1. Open the Social Media Dashboard<br>
+    2. Add screens with URLs<br>
+    3. Toggle Auto-Scroll ON
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

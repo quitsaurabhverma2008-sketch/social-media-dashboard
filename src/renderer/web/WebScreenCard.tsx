@@ -13,17 +13,6 @@ interface WebScreenCardProps {
 // Web auto-scroll state per screen (uses number for browser setTimeout return type)
 const webScrollTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
-export function startWebAutoScroll(screenId: number, onScroll: () => void) {
-  stopWebAutoScroll(screenId);
-  const tick = () => {
-    onScroll();
-    const nextDelay = Math.floor(15000 + Math.random() * 30000); // 15-45s
-    webScrollTimers.set(screenId, setTimeout(tick, nextDelay));
-  };
-  const firstDelay = Math.floor(15000 + Math.random() * 30000);
-  webScrollTimers.set(screenId, setTimeout(tick, firstDelay));
-}
-
 export function stopWebAutoScroll(screenId: number) {
   const timer = webScrollTimers.get(screenId);
   if (timer) {
@@ -35,6 +24,28 @@ export function stopWebAutoScroll(screenId: number) {
 export function stopAllWebAutoScroll() {
   webScrollTimers.forEach((timer) => clearTimeout(timer));
   webScrollTimers.clear();
+}
+
+function hasExtension(): boolean {
+  return typeof window !== 'undefined' &&
+    (window as any).__autoScrollExtension?.connected === true;
+}
+
+function scheduleNextTick(screenId: number, onScroll: () => void) {
+  const delay = Math.floor(15000 + Math.random() * 30000);
+  webScrollTimers.set(screenId, setTimeout(() => {
+    onScroll();
+    scheduleNextTick(screenId, onScroll);
+  }, delay));
+}
+
+function startFallbackAutoScroll(screenId: number, onScroll: () => void) {
+  stopWebAutoScroll(screenId);
+  const firstDelay = Math.floor(15000 + Math.random() * 30000);
+  webScrollTimers.set(screenId, setTimeout(() => {
+    onScroll();
+    scheduleNextTick(screenId, onScroll);
+  }, firstDelay));
 }
 
 export default function WebScreenCard({
@@ -52,14 +63,24 @@ export default function WebScreenCard({
   const [currentUrl, setCurrentUrl] = useState(screen.url);
   const [isLoaded, setIsLoaded] = useState(false);
   const [webviewError, setWebviewError] = useState<string | null>(null);
+  const [extConnected, setExtConnected] = useState(hasExtension());
 
-  // Start/stop auto-scroll for this screen
-  // NOTE: Cross-origin iframes cannot be scrolled from the parent.
-  // Auto-scroll timing works but the scroll execution is limited to same-origin content.
+  // Listen for extension connection changes
   useEffect(() => {
-    if (autoScrollActive) {
-      startWebAutoScroll(screen.id, () => {
-        // Attempt to scroll the iframe content
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setExtConnected(detail.connected);
+    };
+    window.addEventListener('extension-connection-change', handler);
+    return () => window.removeEventListener('extension-connection-change', handler);
+  }, []);
+
+  // Auto-scroll: when extension connected, background timer handles timing.
+  // When no extension, fallback to dashboard-side timer with postMessage.
+  useEffect(() => {
+    if (autoScrollActive && !hasExtension()) {
+      // Fallback mode: client-side timer, scroll via postMessage (cross-origin limited)
+      startFallbackAutoScroll(screen.id, () => {
         try {
           const iframe = iframeRef.current;
           if (iframe?.contentWindow) {
@@ -68,9 +89,11 @@ export default function WebScreenCard({
         } catch { /* cross-origin restriction */ }
         if (onScrollExecuted) onScrollExecuted(screen.id);
       });
-    } else {
+    } else if (!autoScrollActive) {
       stopWebAutoScroll(screen.id);
     }
+    // When extension is connected, dashboard timer is SKIPPED to avoid double-scrolling
+    // The background service worker handles timing and sends SCROLL_EXECUTED events
     return () => stopWebAutoScroll(screen.id);
   }, [autoScrollActive, screen.id, onScrollExecuted]);
 
@@ -169,9 +192,15 @@ export default function WebScreenCard({
       </div>
 
       <div className="screen-card-footer">
-        <span className="session-label" title="Web mode - auto-scroll timing active, cross-origin scroll limited">
-          🌐 Web Mode
-        </span>
+        {extConnected ? (
+          <span className="session-label ext-active" title="Extension connected - auto-scroll works in real tabs">
+            🔌 Extension Auto-Scroll
+          </span>
+        ) : (
+          <span className="session-label" title="No extension - auto-scroll timing active, cross-origin scroll limited. Install the extension for full functionality.">
+            🌐 Web Mode {autoScrollActive ? '(timing active)' : ''}
+          </span>
+        )}
       </div>
     </div>
   );
